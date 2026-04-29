@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog"
 import { Edit, Trash2, Plus } from "lucide-react"
 import type { Blog } from "@/types"
 
@@ -23,8 +22,7 @@ interface BlogTableProps {
 export function BlogTable({ blogs }: BlogTableProps) {
   const router = useRouter()
   const supabase = createClientBrowser()
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -34,23 +32,19 @@ export function BlogTable({ blogs }: BlogTableProps) {
     })
   }
 
-  const handleDelete = async () => {
-    if (!deleteId) return
-    setDeleting(true)
-
-    // First get the blog to find the header image path
+  const handleDelete = async (id: string) => {
+    // Get the blog to find the header image path
     const { data: blog } = await supabase
       .from("blogs")
       .select("header_image")
-      .eq("id", deleteId)
+      .eq("id", id)
       .single()
 
     // Delete the blog from database
-    const { error } = await supabase.from("blogs").delete().eq("id", deleteId)
+    const { error } = await supabase.from("blogs").delete().eq("id", id)
 
     if (error) {
       console.error("Error deleting blog:", error)
-      setDeleting(false)
       return
     }
 
@@ -66,8 +60,7 @@ export function BlogTable({ blogs }: BlogTableProps) {
       }
     }
 
-    setDeleteId(null)
-    setDeleting(false)
+    setDeletingId(null)
     router.refresh()
   }
 
@@ -115,7 +108,11 @@ export function BlogTable({ blogs }: BlogTableProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeleteId(blog.id)}
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this blog?")) {
+                            handleDelete(blog.id)
+                          }
+                        }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -127,23 +124,6 @@ export function BlogTable({ blogs }: BlogTableProps) {
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogTitle>Delete Blog</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete this blog? This action cannot be undone.
-          </DialogDescription>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
