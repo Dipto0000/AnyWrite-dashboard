@@ -1,5 +1,7 @@
+import { Suspense } from "react"
 import { getBlog, getCategories } from "@/actions/blogs"
 import { BlogForm } from "@/components/blog-form"
+import { BlogFormSkeleton } from "@/components/skeletons"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
@@ -25,7 +27,9 @@ export default async function EditBlogPage({
           <CardTitle>Edit Blog</CardTitle>
         </CardHeader>
         <CardContent>
-          <BlogForm blog={blog} categories={categories} />
+          <Suspense fallback={<BlogFormSkeleton />}>
+            <BlogForm blog={blog} categories={categories} />
+          </Suspense>
         </CardContent>
       </Card>
     </div>

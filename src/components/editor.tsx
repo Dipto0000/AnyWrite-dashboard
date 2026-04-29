@@ -1,11 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
 import Link from "@tiptap/extension-link"
 import Placeholder from "@tiptap/extension-placeholder"
+import Image from "@tiptap/extension-image"
 import { cn } from "@/lib/utils"
+import { createClientBrowser } from "@/lib/supabase/client"
 import {
   Bold,
   Italic,
@@ -17,8 +20,10 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Image as ImageIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface EditorProps {
   content: string
@@ -54,6 +59,43 @@ const PlaceholderExtension = Placeholder.configure({
 })
 
 export function Editor({ content, onChange, className }: EditorProps) {
+  const supabase = createClientBrowser()
+  const [uploading, setUploading] = useState(false)
+  const [imageInputKey, setImageInputKey] = useState(0)
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !editor) return
+
+    setUploading(true)
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${Date.now()}.${fileExt}`
+    const filePath = `blog-content/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("blog-images")
+      .upload(filePath, file)
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError)
+      setUploading(false)
+      return
+    }
+
+    const { data } = supabase.storage.from("blog-images").getPublicUrl(filePath)
+    
+    editor.chain().focus().setImage({ src: data.publicUrl }).run()
+    setUploading(false)
+    setImageInputKey((k) => k + 1)
+  }
+
+  const addLink = () => {
+    const url = window.prompt("Enter URL")
+    if (url && editor) {
+      editor.chain().focus().setLink({ href: url }).run()
+    }
+  }
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -61,6 +103,9 @@ export function Editor({ content, onChange, className }: EditorProps) {
       Underline,
       Link.configure({
         openOnClick: false,
+      }),
+      Image.configure({
+        inline: true,
       }),
       PlaceholderExtension,
     ],
@@ -71,13 +116,6 @@ export function Editor({ content, onChange, className }: EditorProps) {
   })
 
   if (!editor) return null
-
-  const addLink = () => {
-    const url = window.prompt("Enter URL")
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run()
-    }
-  }
 
   return (
     <div className={cn("border border-border rounded-md overflow-hidden", className)}>
@@ -155,8 +193,29 @@ export function Editor({ content, onChange, className }: EditorProps) {
         >
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
+        <div className="relative">
+          <ToolbarButton
+            onClick={() => document.getElementById("inline-image-input")?.click()}
+            title="Add Image"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </ToolbarButton>
+          <Input
+            id="inline-image-input"
+            key={imageInputKey}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          {uploading && (
+            <span className="absolute -top-6 left-0 text-xs text-muted-foreground">
+              Uploading...
+            </span>
+          )}
+        </div>
       </div>
-      <EditorContent editor={editor} className="bg-transparent" />
+      <EditorContent editor={editor} className="bg-transparent min-h-[300px]" />
     </div>
   )
 }
